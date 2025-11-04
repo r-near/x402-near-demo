@@ -111,7 +111,7 @@ near contract call-function as-transaction wrap.testnet storage_deposit \
 ```bash
 # Network
 NEAR_NETWORK=testnet
-NEAR_RPC=https://rpc.testnet.near.org
+NEAR_RPC=https://rpc.testnet.fastnear.com
 
 # Token (NEP-141 contract)
 TOKEN_ACCOUNT_ID=wrap.testnet

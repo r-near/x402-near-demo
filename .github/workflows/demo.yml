@@ -1,0 +1,54 @@
+name: x402 Demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Create .env
+        run: |
+          cat > .env << EOF
+          NEAR_NETWORK=testnet
+          NEAR_RPC=https://rpc.testnet.fastnear.com
+          TOKEN_ACCOUNT_ID=${{ secrets.TOKEN_ACCOUNT_ID }}
+          SELLER_ACCOUNT_ID=${{ secrets.SELLER_ACCOUNT_ID }}
+          RELAYER_ACCOUNT_ID=${{ secrets.RELAYER_ACCOUNT_ID }}
+          RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }}
+          PRICE_ATOMIC=${{ secrets.PRICE_ATOMIC }}
+          SELLER_PORT=4021
+          FACILITATOR_PORT=4022
+          BUYER_ACCOUNT_ID=${{ secrets.BUYER_ACCOUNT_ID }}
+          BUYER_PRIVATE_KEY=${{ secrets.BUYER_PRIVATE_KEY }}
+          EOF
+
+      - name: Start facilitator
+        run: bun run facilitator &
+        env:
+          FORCE_COLOR: "3"
+
+      - name: Start seller
+        run: bun run seller &
+        env:
+          FORCE_COLOR: "3"
+
+      - name: Wait for services
+        run: sleep 3
+
+      - name: Run buyer demo
+        run: bun run buyer
+        env:
+          FORCE_COLOR: "3"
