@@ -24,14 +24,14 @@ jobs:
           cat > .env << EOF
           NEAR_NETWORK=testnet
           NEAR_RPC=https://rpc.testnet.fastnear.com
-          TOKEN_ACCOUNT_ID=${{ secrets.TOKEN_ACCOUNT_ID }}
-          SELLER_ACCOUNT_ID=${{ secrets.SELLER_ACCOUNT_ID }}
-          RELAYER_ACCOUNT_ID=${{ secrets.RELAYER_ACCOUNT_ID }}
+          TOKEN_ACCOUNT_ID=3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af
+          SELLER_ACCOUNT_ID=x402-seller.testnet
+          RELAYER_ACCOUNT_ID=x402-relayer.testnet
           RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }}
-          PRICE_ATOMIC=${{ secrets.PRICE_ATOMIC }}
+          PRICE_ATOMIC=10000
           SELLER_PORT=4021
           FACILITATOR_PORT=4022
-          BUYER_ACCOUNT_ID=${{ secrets.BUYER_ACCOUNT_ID }}
+          BUYER_ACCOUNT_ID=x402-buyer.testnet
           BUYER_PRIVATE_KEY=${{ secrets.BUYER_PRIVATE_KEY }}
           EOF
 
