@@ -1,5 +1,5 @@
-import { decodeSignedDelegateAction, Near, type SignedDelegateAction } from "near-kit"
 import { Hono } from "hono"
+import { decodeSignedDelegateAction, Near, type SignedDelegateAction } from "near-kit"
 import { z } from "zod"
 
 const {
@@ -89,13 +89,12 @@ function verifyPayment(
 
 async function settlePayment(delegate: SignedDelegateAction) {
   const relayer = getRelayer()
+  if (!RELAYER_ACCOUNT_ID) {
+    throw new Error("RELAYER_ACCOUNT_ID not set")
+  }
 
   // Submit meta-tx: relayer sends to delegate sender with signedDelegate action
-  const result = await relayer
-    .transaction(delegate.signedDelegate.delegateAction.senderId)
-    .signedDelegateAction(delegate)
-    .send()
-
+  const result = await relayer.transaction(RELAYER_ACCOUNT_ID).signedDelegateAction(delegate).send()
   return {
     ok: true,
     txHash: result.transaction.hash,
@@ -117,7 +116,10 @@ app.post("/verify", async (c) => {
     const required = PaymentDetails.parse(paymentDetails)
     const delegate = verifyPayment(payment, required)
 
-    return c.json({ valid: true, sender: delegate.signedDelegate.delegateAction.senderId })
+    return c.json({
+      valid: true,
+      sender: delegate.signedDelegate.delegateAction.senderId,
+    })
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e)
     return c.json({ valid: false, error }, 400)

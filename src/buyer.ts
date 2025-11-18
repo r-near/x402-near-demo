@@ -78,7 +78,7 @@ async function main() {
   // Build ft_transfer call with exact amount from seller's 402
   console.log(pc.dim("✍️  Signing meta-transaction (gasless)..."))
   const { payload } = await near
-    .transaction(TOKEN_ACCOUNT_ID)
+    .transaction(BUYER_ACCOUNT_ID)
     .functionCall(
       TOKEN_ACCOUNT_ID,
       "ft_transfer",
@@ -105,21 +105,30 @@ async function main() {
   console.log(pc.dim("📡 Submitting payment to facilitator...\n"))
   const startTime = Date.now()
   res = await fetch(url, {
-    headers: { "x-payment": Buffer.from(JSON.stringify(payment)).toString("base64") },
+    headers: {
+      "x-payment": Buffer.from(JSON.stringify(payment)).toString("base64"),
+    },
   })
   const duration = ((Date.now() - startTime) / 1000).toFixed(2)
 
   if (res.status === 200) {
     console.log(pc.green(`✅ Payment confirmed in ${duration}s`))
 
-    const data = (await res.json()) as { report: Record<string, unknown>; paid: { tx: string } }
+    const data = (await res.json()) as {
+      report: Record<string, unknown>
+      paid: { tx: string }
+    }
     const receipt = res.headers.get("x-payment-response")
     const settlement = receipt
-      ? (JSON.parse(Buffer.from(receipt, "base64").toString("utf8")) as { txHash?: string })
+      ? (JSON.parse(Buffer.from(receipt, "base64").toString("utf8")) as {
+          txHash?: string
+        })
       : null
 
     if (settlement?.txHash) {
-      console.log(pc.blue(`  🔗 Transaction: https://testnet.nearblocks.io/txns/${settlement.txHash}\n`))
+      console.log(
+        pc.blue(`  🔗 Transaction: https://testnet.nearblocks.io/txns/${settlement.txHash}\n`),
+      )
     }
 
     console.log(pc.cyan("📦 Resource unlocked:"))

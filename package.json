@@ -21,7 +21,7 @@
   "dependencies": {
     "bn.js": "^5.2.2",
     "hono": "^4.10.4",
-    "near-kit": "^0.4.0",
+    "near-kit": "^0.4.1",
     "picocolors": "^1.1.1",
     "zod": "^4.1.12"
   }
