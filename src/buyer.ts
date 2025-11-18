@@ -1,8 +1,4 @@
-import { Account } from "@near-js/accounts"
-import type { KeyPairString } from "@near-js/crypto"
-import { JsonRpcProvider } from "@near-js/providers"
-import { KeyPairSigner } from "@near-js/signers"
-import { actionCreators, encodeSignedDelegate } from "@near-js/transactions"
+import { Near } from "near-kit"
 import pc from "picocolors"
 
 const {
@@ -19,10 +15,6 @@ if (!TOKEN_ACCOUNT_ID || !SELLER_ACCOUNT_ID) {
 }
 if (!BUYER_ACCOUNT_ID || !BUYER_PRIVATE_KEY) {
   throw new Error("Missing BUYER creds")
-}
-
-function toB64(u8: Uint8Array) {
-  return Buffer.from(u8).toString("base64")
 }
 
 interface AcceptsEntry {
@@ -52,19 +44,16 @@ async function main() {
     throw new Error("Missing required environment variables")
   }
 
-  const provider = new JsonRpcProvider({ url: NEAR_RPC })
-  const signer = KeyPairSigner.fromSecretKey(BUYER_PRIVATE_KEY as KeyPairString)
-  const buyer = new Account(BUYER_ACCOUNT_ID, provider, signer)
+  const near = new Near({
+    network: { rpcUrl: NEAR_RPC, networkId: "testnet" },
+    privateKey: BUYER_PRIVATE_KEY as `ed25519:${string}`,
+    defaultSignerId: BUYER_ACCOUNT_ID,
+  })
 
   console.log(pc.dim("📊 Checking balances..."))
-  const initialBalance = (await provider.query({
-    request_type: "call_function",
-    account_id: TOKEN_ACCOUNT_ID,
-    method_name: "ft_balance_of",
-    args_base64: Buffer.from(JSON.stringify({ account_id: BUYER_ACCOUNT_ID })).toString("base64"),
-    finality: "final",
-  })) as unknown as { result: number[] }
-  const initialBalanceStr = JSON.parse(Buffer.from(initialBalance.result).toString())
+  const initialBalanceStr = await near.view<string>(TOKEN_ACCOUNT_ID, "ft_balance_of", {
+    account_id: BUYER_ACCOUNT_ID,
+  })
   console.log(pc.dim(`  Your balance: ${Number(initialBalanceStr) / 1e6} USDC\n`))
 
   // First call → get 402 with payment requirements
@@ -88,24 +77,19 @@ async function main() {
 
   // Build ft_transfer call with exact amount from seller's 402
   console.log(pc.dim("✍️  Signing meta-transaction (gasless)..."))
-  const transfer = actionCreators.functionCall(
-    "ft_transfer",
-    Buffer.from(
-      JSON.stringify({
+  const { payload } = await near
+    .transaction(TOKEN_ACCOUNT_ID)
+    .functionCall(
+      TOKEN_ACCOUNT_ID,
+      "ft_transfer",
+      {
         receiver_id: SELLER_ACCOUNT_ID,
         amount: paymentReq.amountExactAtomic,
         memo: `x402 payment ${invoice.id}`,
-      }),
-    ),
-    30_000_000_000_000n, // 30 Tgas
-    1n, // 1 yoctoNEAR
-  )
-
-  const [, signedDelegate] = await buyer.createSignedMetaTransaction(
-    TOKEN_ACCOUNT_ID,
-    [transfer],
-    600,
-  )
+      },
+      { attachedDeposit: "1 yocto", gas: "30 Tgas" },
+    )
+    .delegate({ blockHeightOffset: 600 })
 
   // Build X-PAYMENT header
   const payment = {
@@ -113,7 +97,7 @@ async function main() {
     network: paymentReq.network,
     asset: paymentReq.asset,
     payTo: paymentReq.payTo,
-    delegateB64: toB64(encodeSignedDelegate(signedDelegate)),
+    delegateB64: payload,
     invoiceId: invoice.id,
   }
 
@@ -142,14 +126,9 @@ async function main() {
     console.log(`  ${JSON.stringify(data.report)}\n`)
 
     // Check final balance
-    const finalBalance = (await provider.query({
-      request_type: "call_function",
-      account_id: TOKEN_ACCOUNT_ID,
-      method_name: "ft_balance_of",
-      args_base64: Buffer.from(JSON.stringify({ account_id: BUYER_ACCOUNT_ID })).toString("base64"),
-      finality: "final",
-    })) as unknown as { result: number[] }
-    const finalBalanceStr = JSON.parse(Buffer.from(finalBalance.result).toString())
+    const finalBalanceStr = await near.view<string>(TOKEN_ACCOUNT_ID, "ft_balance_of", {
+      account_id: BUYER_ACCOUNT_ID,
+    })
     console.log(pc.dim("📊 Updated balance:"))
     console.log(pc.dim(`  Your balance: ${Number(finalBalanceStr) / 1e6} USDC`))
     console.log(pc.dim(`  Amount paid: ${priceUSDC} USDC`))

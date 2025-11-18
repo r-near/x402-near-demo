@@ -19,14 +19,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@near-js/accounts": "^2.5.0",
-    "@near-js/crypto": "^2.5.0",
-    "@near-js/providers": "^2.5.0",
-    "@near-js/signers": "^2.5.0",
-    "@near-js/transactions": "^2.5.0",
     "bn.js": "^5.2.2",
-    "borsh": "^2.0.0",
     "hono": "^4.10.4",
+    "near-kit": "^0.4.0",
     "picocolors": "^1.1.1",
     "zod": "^4.1.12"
   }
