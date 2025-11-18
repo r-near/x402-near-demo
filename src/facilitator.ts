@@ -1,35 +1,7 @@
-import { deserialize } from "borsh"
 import { Hono } from "hono"
-import { Near, DelegateAction, SignedDelegate } from "near-kit"
+import type { SignedDelegateAction } from "near-kit"
+import { Near } from "near-kit"
 import { z } from "zod"
-
-// Borsh schema for deserializing SignedDelegate (NEP-366 format)
-const SIGNED_DELEGATE_SCHEMA = new Map([
-  [
-    SignedDelegate,
-    {
-      kind: "struct",
-      fields: [
-        ["delegateAction", DelegateAction],
-        ["signature", { kind: "struct", fields: [["data", ["u8"]]] }],
-      ],
-    },
-  ],
-  [
-    DelegateAction,
-    {
-      kind: "struct",
-      fields: [
-        ["senderId", "string"],
-        ["receiverId", "string"],
-        ["actions", [{ kind: "option" }]],
-        ["nonce", "u64"],
-        ["maxBlockHeight", "u64"],
-        ["publicKey", { kind: "struct", fields: [["data", ["u8"]]] }],
-      ],
-    },
-  ],
-])
 
 const {
   NEAR_RPC = "https://rpc.testnet.near.org",
@@ -46,8 +18,8 @@ if (!TOKEN_ACCOUNT_ID || !SELLER_ACCOUNT_ID || !RELAYER_ACCOUNT_ID || !RELAYER_P
   )
 }
 
-function decodeB64(b64: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(b64, "base64"))
+function decodeB64(b64: string): string {
+  return Buffer.from(b64, "base64").toString("utf8")
 }
 
 function getNear(): Near {
@@ -84,19 +56,16 @@ const PaymentDetails = z.object({
 function verifyPayment(
   payload: z.infer<typeof PaymentPayload>,
   required: z.infer<typeof PaymentDetails>,
-): SignedDelegate {
+): SignedDelegateAction {
   // Check basic fields match
   if (payload.asset !== required.asset) throw new Error("Asset mismatch")
   if (payload.payTo !== required.payTo) throw new Error("Recipient mismatch")
   if (payload.network !== required.network) throw new Error("Network mismatch")
 
-  // Deserialize signed delegate
-  const delegate = deserialize(
-    SCHEMA.SignedDelegate,
-    Buffer.from(decodeB64(payload.delegateB64)),
-  ) as SignedDelegate
+  // Parse signed delegate from base64-encoded JSON
+  const delegate = JSON.parse(decodeB64(payload.delegateB64)) as SignedDelegateAction
 
-  if (delegate.delegateAction.receiverId !== required.asset) {
+  if (delegate.signedDelegate.delegateAction.receiverId !== required.asset) {
     throw new Error("Delegate must target token contract")
   }
 
@@ -104,11 +73,13 @@ function verifyPayment(
   const requiredAmount = BigInt(required.amountExactAtomic)
   let foundAmount: bigint | null = null
 
-  for (const action of delegate.delegateAction.actions) {
+  for (const action of delegate.signedDelegate.delegateAction.actions) {
     if ("functionCall" in action && action.functionCall) {
       const { methodName, args } = action.functionCall
       if (methodName === "ft_transfer" || methodName === "ft_transfer_call") {
-        const argsStr = Buffer.from(args).toString("utf8")
+        // args is a Uint8Array, convert to string
+        const argsArray = Array.isArray(args) ? args : Array.from(args)
+        const argsStr = Buffer.from(argsArray).toString("utf8")
         const parsed = JSON.parse(argsStr)
         const recipient = parsed.receiver_id || parsed.receiverId
         if (recipient === required.payTo) {
@@ -124,14 +95,14 @@ function verifyPayment(
   return delegate
 }
 
-async function settlePayment(delegate: SignedDelegate) {
-  const relayer = getRelayer()
+async function settlePayment(delegate: SignedDelegateAction) {
+  const near = getNear()
 
-  // Submit meta-tx: relayer sends to delegate sender with signedDelegate action
-  const result = await relayer.signAndSendTransaction({
-    receiverId: delegate.delegateAction.senderId,
-    actions: [actionCreators.signedDelegate(delegate)],
-  })
+  // Submit meta-tx: relayer wraps and sends the user's signed delegate action
+  const result = await near
+    .transaction(RELAYER_ACCOUNT_ID)
+    .signedDelegateAction(delegate)
+    .send()
 
   return {
     ok: true,
