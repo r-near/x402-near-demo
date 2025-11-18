@@ -1,11 +1,35 @@
-import { Account } from "@near-js/accounts"
-import type { KeyPairString } from "@near-js/crypto"
-import { JsonRpcProvider } from "@near-js/providers"
-import { KeyPairSigner } from "@near-js/signers"
-import { actionCreators, SCHEMA, type SignedDelegate } from "@near-js/transactions"
 import { deserialize } from "borsh"
 import { Hono } from "hono"
+import { Near, DelegateAction, SignedDelegate } from "near-kit"
 import { z } from "zod"
+
+// Borsh schema for deserializing SignedDelegate (NEP-366 format)
+const SIGNED_DELEGATE_SCHEMA = new Map([
+  [
+    SignedDelegate,
+    {
+      kind: "struct",
+      fields: [
+        ["delegateAction", DelegateAction],
+        ["signature", { kind: "struct", fields: [["data", ["u8"]]] }],
+      ],
+    },
+  ],
+  [
+    DelegateAction,
+    {
+      kind: "struct",
+      fields: [
+        ["senderId", "string"],
+        ["receiverId", "string"],
+        ["actions", [{ kind: "option" }]],
+        ["nonce", "u64"],
+        ["maxBlockHeight", "u64"],
+        ["publicKey", { kind: "struct", fields: [["data", ["u8"]]] }],
+      ],
+    },
+  ],
+])
 
 const {
   NEAR_RPC = "https://rpc.testnet.near.org",
@@ -26,13 +50,16 @@ function decodeB64(b64: string): Uint8Array {
   return Uint8Array.from(Buffer.from(b64, "base64"))
 }
 
-function getRelayer(): Account {
+function getNear(): Near {
   if (!RELAYER_ACCOUNT_ID || !RELAYER_PRIVATE_KEY) {
     throw new Error("RELAYER credentials not configured")
   }
-  const provider = new JsonRpcProvider({ url: NEAR_RPC })
-  const signer = KeyPairSigner.fromSecretKey(RELAYER_PRIVATE_KEY as KeyPairString)
-  return new Account(RELAYER_ACCOUNT_ID, provider, signer)
+  return new Near({
+    network: "testnet",
+    rpcUrl: NEAR_RPC,
+    privateKey: RELAYER_PRIVATE_KEY as `ed25519:${string}`,
+    defaultSignerId: RELAYER_ACCOUNT_ID,
+  })
 }
 
 const PaymentPayload = z.object({
