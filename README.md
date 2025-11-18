@@ -9,12 +9,31 @@ This is a working implementation of the [x402 protocol](https://x402.org) on NEA
 You want to charge for API access. Your clients don't want wallets, popups, or gas management.
 
 With x402 on NEAR:
+
 - **Clients pay with tokens, not NEAR** - they sign off-chain, a relayer pays gas
 - **No wallet UI** - pure HTTP headers, works in any client
 - **Per-request pricing** - charge $0.001 per API call if you want
 - **Instant settlement** - payment confirmed on-chain before returning data
 
 **Perfect for:** AI agents, data APIs, rate-limited services, paywalled content.
+
+## Built with near-kit
+
+This implementation uses [**near-kit**](https://github.com/r-near/near-kit) - a modern, intuitive TypeScript library for building on NEAR.
+
+**Why near-kit?**
+
+- **Chainable transactions**: Fluent API for building complex operations
+- **Built-in meta-transactions**: First-class support for gasless payments (NEP-366)
+- **Type-safe**: Full TypeScript support with excellent IDE autocomplete
+
+```typescript
+// Creating a gasless meta-transaction with near-kit
+const result = await near
+  .transaction(TOKEN_ACCOUNT_ID)
+  .functionCall(TOKEN_ACCOUNT_ID, "ft_transfer", args, { gas: "30 Tgas" })
+  .delegate()
+```
 
 ## The Flow
 
@@ -48,6 +67,7 @@ bun run buyer        # Runs payment demo
 ```
 
 You'll see:
+
 - Initial `402` response with payment requirements
 - Client signs meta-transaction (no gas needed)
 - Settlement confirmation with transaction hash
@@ -59,19 +79,23 @@ You'll see:
 Three simple services:
 
 ### 1. **Seller** (`src/seller.ts`)
+
 Your protected API. Returns `402` with payment requirements on first call. On retry with `X-PAYMENT` header, calls facilitator to verify and settle, then returns your data.
 
 ```typescript
 // Price lives with the seller
-PRICE_ATOMIC=10000  // 0.01 USDC (6 decimals)
+PRICE_ATOMIC = 10000 // 0.01 USDC (6 decimals)
 ```
 
 ### 2. **Facilitator** (`src/facilitator.ts`)
+
 The relayer/verifier. Has two endpoints:
+
 - `POST /verify` - Validates the signed meta-transaction matches payment requirements
 - `POST /settle` - Submits transaction on-chain and pays gas
 
 ### 3. **Buyer** (`src/buyer.ts`)
+
 Your client (or an agent). Gets `402`, signs a NEAR `DelegateAction` that transfers tokens to seller, retries with `X-PAYMENT` header.
 
 ## Setup Requirements
@@ -143,6 +167,7 @@ FACILITATOR_PORT=4022
 3. NEAR executes the inner action as if the buyer sent it
 
 In this demo:
+
 - Buyer signs: `ft_transfer(seller, amount)` on token contract
 - Relayer posts: `signedDelegate(buyer's signature)`
 - Result: Tokens move from buyer → seller, relayer pays gas
@@ -162,19 +187,23 @@ package.json         # Bun scripts (facilitator, seller, buyer)
 ## Troubleshooting
 
 **`PAYMENT_INVALID: Delegate missing required transfer`**
+
 - Your signed meta-tx doesn't include `ft_transfer` to the seller for the exact amount
 
 **`PAYMENT_NOT_SETTLED`**
+
 - Seller or buyer not storage-registered on token contract
 - Relayer account out of NEAR (can't pay gas)
 - Check relayer has enough NEAR: `near account view-account-summary relayer.testnet network-config testnet now`
 
 **Wrong decimals / amounts**
+
 - `PRICE_ATOMIC` must match token decimals exactly
 - USDC = 6 decimals (`1000000` = 1 USDC)
 - wNEAR = 24 decimals (`1000000000000000000000000` = 1 NEAR)
 
 **Buyer "needs gas"?**
+
 - Not for payments! But storage registration requires one-time NEAR deposit
 - In production, relayer can sponsor storage registration for new users
 
