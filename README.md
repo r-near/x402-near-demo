@@ -16,6 +16,27 @@ With x402 on NEAR:
 
 **Perfect for:** AI agents, data APIs, rate-limited services, paywalled content.
 
+## Built with near-kit
+
+This implementation uses [**near-kit**](https://kit.near.tools) - a modern, intuitive TypeScript library for NEAR Protocol that makes blockchain interactions feel like using `fetch()`.
+
+**Why near-kit?**
+- **Simple & clean** - `new Near()` instead of manual Provider/Signer/Account setup
+- **Type-safe** - Full TypeScript support with IDE autocomplete
+- **Human-readable** - `"1 yocto"`, `"30 Tgas"` instead of raw bigints
+- **Powerful builders** - `.transaction().functionCall().delegate()` for meta-transactions
+- **Built-in helpers** - `decodeSignedDelegateAction()` handles borsh serialization
+
+```typescript
+// Creating a gasless meta-transaction with near-kit
+const { payload } = await near
+  .transaction(TOKEN_ACCOUNT_ID)
+  .functionCall(TOKEN_ACCOUNT_ID, "ft_transfer", args, { gas: "30 Tgas" })
+  .delegate({ blockHeightOffset: 600 })
+```
+
+Compared to raw `@near-js/*` packages, near-kit delivers ~40% less code with better developer experience.
+
 ## The Flow
 
 ```
