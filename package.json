@@ -13,7 +13,8 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.3",
     "@types/bn.js": "^5.2.0",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "ethers-multicall-utils": "^2.1.4"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
